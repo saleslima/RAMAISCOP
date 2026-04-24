@@ -55,17 +55,16 @@
     .box {
       position: absolute;
       border: 2px solid #000;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      display: block;
       text-align: center;
-      white-space: pre-line;
+      white-space: normal;
       overflow: hidden;
       user-select: none;
-      line-height: 1.05;
+      line-height: 1.15;
       font-weight: bold;
       color: #111;
       background: #cfe2f3;
+      padding: 3px 4px;
     }
 
     .box.texto-livre {
@@ -478,6 +477,11 @@
     </div>
 
     <div class="campo">
+      <label>Espaçamento entre linhas</label>
+      <input id="edLineHeight" type="number" min="0.6" max="4" step="0.05">
+    </div>
+
+    <div class="campo">
       <label>Fonte</label>
       <select id="edFont">
         <option value="Arial">Arial</option>
@@ -541,10 +545,10 @@
     </div>
 
     <div class="aviso">
-      A quantidade de linhas do objeto é definida pelo que for digitado na caixa Texto.
+      O texto agora se comporta como no Word: a largura do objeto é o limite da escrita,
+      e quando o texto alcança esse limite ele quebra automaticamente para a linha de baixo.
       Use o botão <b>Type In</b> para ativar/desativar a digitação dentro do próprio objeto.
-      Com Type In ativado, clique no objeto e digite diretamente dentro dele.
-      Também é possível dar dois cliques em um objeto para ativar a função Type.
+      No modo admin, também é possível configurar o <b>espaçamento entre linhas</b>.
       Ao apertar Enter no Texto ou dentro do objeto, a nova linha aparece também dentro do retângulo.
       Cada linha pode ter tamanho, cor, fonte e peso diferentes.
       Clique e arraste qualquer caixa para mover. Também é possível mover com as setas do teclado.
@@ -604,6 +608,7 @@ const campos = {
   color: document.getElementById("edColor"),
   fontSize: document.getElementById("edFontSize"),
   weight: document.getElementById("edWeight"),
+  lineHeight: document.getElementById("edLineHeight"),
   font: document.getElementById("edFont"),
   x: document.getElementById("edX"),
   y: document.getElementById("edY"),
@@ -676,7 +681,8 @@ function add(id, texto, x, y, w, h, bg, color, fontSize, tipo, rot, z, border, w
     z: Number(z || 1),
     border: Number(border ?? 2),
     weight: weight || "bold",
-    font: font || "Arial"
+    font: font || "Arial",
+    lineHeight: 1.15
   };
 }
 
@@ -911,6 +917,7 @@ function renderizar() {
     el.style.fontSize = obj.fontSize + "px";
     el.style.fontFamily = obj.font || "Arial";
     el.style.fontWeight = obj.weight || "bold";
+    el.style.lineHeight = String(obj.lineHeight || 1.15);
     el.style.transform = "rotate(" + (obj.rot || 0) + "deg)";
     el.style.borderWidth = (obj.border ?? 2) + "px";
     el.style.zIndex = obj.z || 1;
@@ -1217,6 +1224,7 @@ function selecionar(id) {
   campos.color.value = paraHex(o.color || "#111111");
   campos.fontSize.value = o.fontSize || 18;
   campos.weight.value = o.weight || "bold";
+  campos.lineHeight.value = o.lineHeight || 1.15;
   campos.font.value = o.font || "Arial";
   campos.x.value = o.x || 0;
   campos.y.value = o.y || 0;
@@ -1241,7 +1249,7 @@ function selecionar(id) {
 
 [
   campos.texto, campos.bg, campos.color, campos.fontSize, campos.weight,
-  campos.font, campos.x, campos.y, campos.w, campos.h, campos.rot,
+  campos.lineHeight, campos.font, campos.x, campos.y, campos.w, campos.h, campos.rot,
   campos.border, campos.z, campos.tipo
 ].forEach(campo => {
   campo.addEventListener("input", atualizarSelecionado);
@@ -1271,6 +1279,7 @@ function atualizarSelecionado() {
   o.color = campos.color.value;
   o.fontSize = Number(campos.fontSize.value || 18);
   o.weight = campos.weight.value;
+  o.lineHeight = Number(campos.lineHeight.value || 1.15);
   o.font = campos.font.value;
   o.x = Number(campos.x.value || 0);
   o.y = Number(campos.y.value || 0);
