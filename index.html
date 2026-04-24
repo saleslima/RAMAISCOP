@@ -441,13 +441,17 @@
     }
 
     .pdf-export {
-      width: 1600px;
-      max-width: none;
+      width: 1600px !important;
+      max-width: none !important;
+      padding: 18px 18px 40px !important;
+      overflow: visible !important;
+      background: #fff !important;
     }
 
     .pdf-export .topbar {
-      position: static;
-      border-bottom: none;
+      position: static !important;
+      border-bottom: none !important;
+      background: #fff !important;
     }
 
     .pdf-export .header-actions,
@@ -455,23 +459,32 @@
       display: none !important;
     }
 
+    .pdf-export .board {
+      max-width: 1564px !important;
+      width: 1564px !important;
+      overflow: visible !important;
+    }
+
     .pdf-export .zone-row {
-      grid-template-columns: 44px 1fr;
+      grid-template-columns: 58px 1fr !important;
+      gap: 10px !important;
+      overflow: visible !important;
     }
 
     .pdf-export .vertical-title {
-      writing-mode: initial;
-      transform: none;
-      font-size: 20px;
-      line-height: 1.1;
-      word-break: keep-all;
-      overflow-wrap: normal;
-      white-space: normal;
-      padding: 0 2px;
-    }
-
-    .pdf-export .vertical-title br {
-      display: none;
+      writing-mode: vertical-rl !important;
+      transform: rotate(180deg) !important;
+      text-align: center !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      font-size: 24px !important;
+      line-height: 1.15 !important;
+      letter-spacing: .5px !important;
+      white-space: normal !important;
+      word-break: normal !important;
+      overflow: visible !important;
+      padding: 8px 0 !important;
     }
 
     @media print {
@@ -855,12 +868,18 @@
         await new Promise(resolve => setTimeout(resolve, 250));
 
         const canvas = await html2canvas(page, {
-          scale: 2,
+          scale: 3,
           useCORS: true,
+          allowTaint: true,
           backgroundColor: '#ffffff',
-          windowWidth: 1600,
+          width: page.scrollWidth,
+          height: page.scrollHeight,
+          windowWidth: page.scrollWidth,
+          windowHeight: page.scrollHeight,
           scrollX: 0,
-          scrollY: 0
+          scrollY: 0,
+          x: 0,
+          y: 0
         });
 
         const imgData = canvas.toDataURL('image/png', 1.0);
