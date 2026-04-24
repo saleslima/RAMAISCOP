@@ -260,28 +260,6 @@
       white-space: pre-wrap;
     }
 
-    .linha-acoes {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      margin-bottom: 10px;
-    }
-
-    .linha-acoes button {
-      box-shadow: none;
-      padding: 9px;
-    }
-
-    #btnAdicionarLinha {
-      background: #111;
-      color: #fff;
-    }
-
-    #btnRemoverLinha {
-      background: #b00000;
-      color: #fff;
-    }
-
     .painel-btn-excluir {
       width: 100%;
       background: #b00000;
@@ -403,19 +381,9 @@
     <div class="linha-editor">
       <div class="linha-editor-titulo">Configurar linha individual</div>
 
-      <div class="linha-acoes">
-        <button type="button" id="btnAdicionarLinha" class="btn">+ Adicionar linha</button>
-        <button type="button" id="btnRemoverLinha" class="btn">Excluir linha</button>
-      </div>
-
       <div class="campo">
         <label>Linha do texto</label>
         <select id="edLinha"></select>
-      </div>
-
-      <div class="campo">
-        <label>Texto desta linha</label>
-        <input id="edLinhaTexto" type="text" placeholder="Digite o texto desta linha">
       </div>
 
       <div class="grade2">
@@ -550,7 +518,8 @@
     </div>
 
     <div class="aviso">
-      Ao clicar em um objeto, você pode adicionar ou excluir linhas de texto.
+      A quantidade de linhas do objeto é definida pelo que for digitado na caixa Texto.
+      Ao apertar Enter no Texto, a nova linha aparece também dentro do retângulo.
       Cada linha pode ter tamanho, cor, fonte e peso diferentes.
       Clique e arraste qualquer caixa para mover. Também é possível mover com as setas do teclado.
       Use Shift + seta para mover mais rápido. Use o ponto vermelho no canto para aumentar ou diminuir.
@@ -618,9 +587,6 @@ const campos = {
   z: document.getElementById("edZ"),
   tipo: document.getElementById("edTipo"),
   linha: document.getElementById("edLinha"),
-  linhaTexto: document.getElementById("edLinhaTexto"),
-  btnAdicionarLinha: document.getElementById("btnAdicionarLinha"),
-  btnRemoverLinha: document.getElementById("btnRemoverLinha"),
   linhaFontSize: document.getElementById("edLinhaFontSize"),
   linhaColor: document.getElementById("edLinhaColor"),
   linhaFont: document.getElementById("edLinhaFont"),
@@ -1091,22 +1057,19 @@ btnReset.addEventListener("click", function() {
 
 function obterLinhasObjeto(obj) {
   const linhas = String(obj.texto || "").split("\n");
-  if (linhas.length === 0) return [""];
-  return linhas;
+  return linhas.length ? linhas : [""];
 }
 
-function salvarLinhasNoObjeto(obj, linhas) {
-  obj.texto = linhas.join("\n");
+function limparEstilosDeLinhasExcluidas(obj) {
+  const linhas = obterLinhasObjeto(obj);
+
   if (!obj.lineStyles) obj.lineStyles = {};
 
   Object.keys(obj.lineStyles).forEach(k => {
-    if (Number(k) >= linhas.length) delete obj.lineStyles[k];
+    if (Number(k) >= linhas.length) {
+      delete obj.lineStyles[k];
+    }
   });
-}
-
-function atualizarTextareaDoObjeto() {
-  if (!selecionado) return;
-  campos.texto.value = objetos[selecionado].texto || "";
 }
 
 function atualizarListaLinhas(indiceDesejado) {
@@ -1114,6 +1077,8 @@ function atualizarListaLinhas(indiceDesejado) {
 
   const o = objetos[selecionado];
   const linhas = obterLinhasObjeto(o);
+
+  limparEstilosDeLinhasExcluidas(o);
 
   campos.linha.innerHTML = "";
 
@@ -1124,13 +1089,13 @@ function atualizarListaLinhas(indiceDesejado) {
     campos.linha.appendChild(opt);
   });
 
-  if (!o.lineStyles) o.lineStyles = {};
-
   let indice = Number(indiceDesejado ?? campos.linha.value ?? 0);
+
   if (indice < 0) indice = 0;
   if (indice >= linhas.length) indice = linhas.length - 1;
 
   campos.linha.value = String(indice);
+
   carregarEstiloLinhaSelecionada();
 }
 
@@ -1144,29 +1109,12 @@ function carregarEstiloLinhaSelecionada() {
   const st = o.lineStyles[indice] || {};
   const linhas = obterLinhasObjeto(o);
 
-  campos.linhaTexto.value = linhas[indice] || "";
   campos.linhaFontSize.value = st.fontSize || o.fontSize || 18;
   campos.linhaColor.value = paraHex(st.color || o.color || "#111111");
   campos.linhaFont.value = st.font || "";
   campos.linhaWeight.value = st.weight || "";
 
   campos.linhaPreview.textContent = linhas[indice] || "(linha vazia)";
-}
-
-function atualizarTextoLinhaSelecionada() {
-  if (!selecionado) return;
-
-  const o = objetos[selecionado];
-  const linhas = obterLinhasObjeto(o);
-  const indice = Number(campos.linha.value || 0);
-
-  linhas[indice] = campos.linhaTexto.value;
-  salvarLinhasNoObjeto(o, linhas);
-  atualizarTextareaDoObjeto();
-  atualizarListaLinhas(indice);
-
-  marcarAlterado();
-  renderizar();
 }
 
 function atualizarEstiloLinhaSelecionada() {
@@ -1189,57 +1137,7 @@ function atualizarEstiloLinhaSelecionada() {
   renderizar();
 }
 
-function adicionarLinhaAoObjeto() {
-  if (!selecionado) return;
-
-  const o = objetos[selecionado];
-  const linhas = obterLinhasObjeto(o);
-  linhas.push("Nova linha");
-
-  salvarLinhasNoObjeto(o, linhas);
-  atualizarTextareaDoObjeto();
-  atualizarListaLinhas(linhas.length - 1);
-
-  marcarAlterado();
-  renderizar();
-}
-
-function removerLinhaDoObjeto() {
-  if (!selecionado) return;
-
-  const o = objetos[selecionado];
-  const linhas = obterLinhasObjeto(o);
-
-  if (linhas.length <= 1) {
-    alert("O objeto precisa ter pelo menos uma linha.");
-    return;
-  }
-
-  const indice = Number(campos.linha.value || 0);
-  linhas.splice(indice, 1);
-
-  if (o.lineStyles) {
-    const novo = {};
-    Object.keys(o.lineStyles).forEach(k => {
-      const n = Number(k);
-      if (n < indice) novo[n] = o.lineStyles[k];
-      if (n > indice) novo[n - 1] = o.lineStyles[k];
-    });
-    o.lineStyles = novo;
-  }
-
-  salvarLinhasNoObjeto(o, linhas);
-  atualizarTextareaDoObjeto();
-  atualizarListaLinhas(Math.max(0, indice - 1));
-
-  marcarAlterado();
-  renderizar();
-}
-
 campos.linha.addEventListener("change", carregarEstiloLinhaSelecionada);
-campos.linhaTexto.addEventListener("input", atualizarTextoLinhaSelecionada);
-campos.btnAdicionarLinha.addEventListener("click", adicionarLinhaAoObjeto);
-campos.btnRemoverLinha.addEventListener("click", removerLinhaDoObjeto);
 campos.linhaFontSize.addEventListener("input", atualizarEstiloLinhaSelecionada);
 campos.linhaColor.addEventListener("input", atualizarEstiloLinhaSelecionada);
 campos.linhaFont.addEventListener("change", atualizarEstiloLinhaSelecionada);
@@ -1301,7 +1199,7 @@ function atualizarSelecionado() {
   });
 
   if (textoAnterior !== o.texto) {
-    atualizarListaLinhas();
+    atualizarListaLinhas(campos.linha.value);
   }
 
   o.bg = campos.bg.value;
