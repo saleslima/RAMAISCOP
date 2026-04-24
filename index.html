@@ -171,17 +171,7 @@
       padding: 8px 13px;
     }
 
-    #btnTypeIn {
-      display: none;
-      background: #555;
-      color: #fff;
-    }
-
-    #btnTypeIn.ativo {
-      background: #006eff;
-      color: #fff;
-      box-shadow: 0 0 0 3px rgba(0, 110, 255, .25);
-    }
+    /* Type In removido: a edição rica agora é feita no painel admin */
 
     #btnReset {
       display: none;
@@ -279,6 +269,26 @@
       margin-top: 8px;
       min-height: 28px;
       white-space: pre-wrap;
+    }
+
+    .rich-editor {
+      min-height: 95px;
+      max-height: 190px;
+      overflow-y: auto;
+      border: 1px solid #888;
+      background: #fff;
+      border-radius: 8px;
+      padding: 8px;
+      outline: none;
+      white-space: pre-wrap;
+      overflow-wrap: break-word;
+      word-break: break-word;
+      line-height: 1.15;
+    }
+
+    .rich-editor:focus {
+      border-color: #006eff;
+      box-shadow: 0 0 0 3px rgba(0, 110, 255, .15);
     }
 
     .trecho-editor {
@@ -406,7 +416,6 @@
   <div id="toolbar">
     <button id="btnSalvar" class="btn">Salvar alterações</button>
     <button id="btnNovo" class="btn">+</button>
-    <button id="btnTypeIn" class="btn">Type In</button>
     <button id="btnReset" class="btn">Restaurar padrão</button>
     <button id="btnSair" class="btn">Sair admin</button>
     <button id="btnPDF" class="btn">PDF</button>
@@ -419,8 +428,9 @@
     <button id="btnExcluirObjeto" class="btn painel-btn-excluir">Excluir objeto selecionado</button>
 
     <div class="campo">
-      <label>Texto</label>
-      <textarea id="edTexto"></textarea>
+      <label>Texto do objeto</label>
+      <div id="edTextoRich" class="rich-editor" contenteditable="true"></div>
+      <textarea id="edTexto" style="display:none;"></textarea>
     </div>
 
     <div class="linha-editor">
@@ -472,7 +482,7 @@
     </div>
 
     <div class="trecho-editor">
-      <div class="trecho-editor-titulo">Formatar trecho selecionado dentro do objeto</div>
+      <div class="trecho-editor-titulo">Formatar trecho selecionado no texto acima</div>
 
       <div class="grade2">
         <div class="campo">
@@ -609,11 +619,10 @@
     </div>
 
     <div class="aviso">
-      O texto agora se comporta como no Word: a largura do objeto é o limite da escrita,
-      e quando o texto alcança esse limite ele quebra automaticamente para a linha de baixo.
-      Use o botão <b>Type In</b>, selecione uma palavra ou trecho dentro do objeto,
+      O texto agora pode ter trechos diferentes dentro do mesmo objeto.
+      Selecione uma palavra ou trecho no campo <b>Texto do objeto</b>,
       escolha tamanho/fonte/cor/peso e clique em <b>Aplicar no trecho selecionado</b>.
-      No modo admin, também é possível configurar o <b>espaçamento entre linhas</b>.
+      O texto quebra automaticamente dentro do limite do retângulo.
       Ao apertar Enter no Texto ou dentro do objeto, a nova linha aparece também dentro do retângulo.
       Cada linha pode ter tamanho, cor, fonte e peso diferentes.
       Clique e arraste qualquer caixa para mover. Também é possível mover com as setas do teclado.
@@ -661,7 +670,6 @@ const btnAdmin = document.getElementById("btnAdmin");
 const btnPDF = document.getElementById("btnPDF");
 const btnSalvar = document.getElementById("btnSalvar");
 const btnNovo = document.getElementById("btnNovo");
-const btnTypeIn = document.getElementById("btnTypeIn");
 const btnSair = document.getElementById("btnSair");
 const btnReset = document.getElementById("btnReset");
 const painel = document.getElementById("painel");
@@ -669,6 +677,7 @@ const btnExcluirObjeto = document.getElementById("btnExcluirObjeto");
 
 const campos = {
   texto: document.getElementById("edTexto"),
+  textoRich: document.getElementById("edTextoRich"),
   bg: document.getElementById("edBg"),
   color: document.getElementById("edColor"),
   fontSize: document.getElementById("edFontSize"),
@@ -708,7 +717,6 @@ let travarFirebase = false;
 let drag = null;
 let resize = null;
 let digitandoNoObjeto = null;
-let typeInAtivo = false;
 
 /* =========================================================
    CORES
@@ -1008,18 +1016,14 @@ function renderizar() {
 
       el.addEventListener("click", function(e) {
         e.stopPropagation();
-
-        if (typeInAtivo) {
-          ativarDigitacaoNoObjeto(el, obj.id);
-        } else {
-          selecionar(obj.id);
-        }
+        selecionar(obj.id);
       });
 
       el.addEventListener("dblclick", function(e) {
         e.preventDefault();
         e.stopPropagation();
-        ativarDigitacaoNoObjeto(el, obj.id);
+        selecionar(obj.id);
+        campos.textoRich.focus();
       });
 
       const dot = document.createElement("div");
@@ -1079,7 +1083,6 @@ btnAdmin.addEventListener("click", function() {
     document.body.classList.add("admin-mode");
     painel.style.display = "block";
     btnNovo.style.display = "inline-block";
-    btnTypeIn.style.display = "inline-block";
     btnSair.style.display = "inline-block";
     btnReset.style.display = "inline-block";
     alert("Modo administrador ativado. Clique em uma caixa para editar.");
@@ -1091,26 +1094,6 @@ btnAdmin.addEventListener("click", function() {
 
 
 
-
-btnTypeIn.addEventListener("click", function() {
-  if (!adminAtivo) return;
-
-  typeInAtivo = !typeInAtivo;
-  btnTypeIn.classList.toggle("ativo", typeInAtivo);
-
-  if (typeInAtivo) {
-    alert("Type In ativado. Agora clique em um objeto para digitar dentro dele.");
-  } else {
-    if (digitandoNoObjeto) {
-      const el = document.querySelector('.box[data-id="' + digitandoNoObjeto + '"]');
-      if (el) el.blur();
-      digitandoNoObjeto = null;
-    }
-
-    alert("Type In desativado. Voltou ao modo normal de edição.");
-    renderizar();
-  }
-});
 
 btnExcluirObjeto.addEventListener("click", function() {
   if (!adminAtivo) return;
@@ -1176,9 +1159,6 @@ btnSair.addEventListener("click", function() {
   document.body.classList.remove("admin-mode");
   painel.style.display = "none";
   btnNovo.style.display = "none";
-  btnTypeIn.style.display = "none";
-  btnTypeIn.classList.remove("ativo");
-  typeInAtivo = false;
   btnSair.style.display = "none";
   btnReset.style.display = "none";
   renderizar();
@@ -1279,18 +1259,108 @@ function atualizarEstiloLinhaSelecionada() {
   renderizar();
 }
 
+
+function limparHTMLDoEditor(html) {
+  return String(html || "")
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, "")
+    .replace(/ on\w+="[^"]*"/gi, "")
+    .replace(/ on\w+='[^']*'/gi, "");
+}
+
+function textoSimplesDoHTML(html) {
+  const temp = document.createElement("div");
+  temp.innerHTML = html || "";
+  return (temp.innerText || "").replace(/\u00a0/g, " ");
+}
+
+function atualizarObjetoPeloEditorRico() {
+  if (!selecionado) return;
+
+  const o = objetos[selecionado];
+
+  o.html = limparHTMLDoEditor(campos.textoRich.innerHTML);
+  o.texto = textoSimplesDoHTML(o.html);
+  campos.texto.value = o.texto;
+
+  limparEstilosDeLinhasExcluidas(o);
+  atualizarListaLinhas(campos.linha.value);
+
+  marcarAlterado();
+  renderizar();
+}
+
+function selecaoDentroDoEditorRico() {
+  const sel = window.getSelection();
+
+  if (!sel || sel.rangeCount === 0) return false;
+
+  const range = sel.getRangeAt(0);
+  return campos.textoRich.contains(range.commonAncestorContainer);
+}
+
+function aplicarFormatoNoEditorRico() {
+  if (!selecionado) {
+    alert("Selecione um objeto primeiro.");
+    return;
+  }
+
+  campos.textoRich.focus();
+
+  if (!selecaoDentroDoEditorRico()) {
+    alert("Selecione uma palavra ou trecho dentro do campo Texto do objeto.");
+    return;
+  }
+
+  const sel = window.getSelection();
+  const range = sel.getRangeAt(0);
+
+  if (range.collapsed) {
+    alert("Selecione uma palavra ou trecho dentro do campo Texto do objeto.");
+    return;
+  }
+
+  const span = document.createElement("span");
+  span.style.fontSize = Number(campos.trechoFontSize.value || 18) + "px";
+  span.style.fontFamily = campos.trechoFont.value || "Arial";
+  span.style.fontWeight = campos.trechoWeight.value || "normal";
+  span.style.color = campos.trechoColor.value || "#111111";
+
+  try {
+    range.surroundContents(span);
+  } catch (e) {
+    const conteudo = range.extractContents();
+    span.appendChild(conteudo);
+    range.insertNode(span);
+  }
+
+  sel.removeAllRanges();
+
+  atualizarObjetoPeloEditorRico();
+}
+
+campos.textoRich.addEventListener("input", atualizarObjetoPeloEditorRico);
+campos.textoRich.addEventListener("paste", function(e) {
+  e.preventDefault();
+
+  const texto = (e.clipboardData || window.clipboardData).getData("text/plain");
+  document.execCommand("insertText", false, texto);
+});
+
+
 campos.linha.addEventListener("change", carregarEstiloLinhaSelecionada);
 campos.linhaFontSize.addEventListener("input", atualizarEstiloLinhaSelecionada);
 campos.linhaColor.addEventListener("input", atualizarEstiloLinhaSelecionada);
 campos.linhaFont.addEventListener("change", atualizarEstiloLinhaSelecionada);
 campos.linhaWeight.addEventListener("change", atualizarEstiloLinhaSelecionada);
-campos.btnAplicarTrecho.addEventListener("click", aplicarFormatoNoTrechoSelecionado);
+campos.btnAplicarTrecho.addEventListener("click", aplicarFormatoNoEditorRico);
 
 function selecionar(id) {
   selecionado = id;
   const o = objetos[id];
 
   campos.texto.value = o.texto || "";
+  campos.textoRich.innerHTML = o.html || montarTextoComLinhas(o);
   campos.bg.value = paraHex(o.bg || "#ffffff");
   campos.color.value = paraHex(o.color || "#111111");
   campos.fontSize.value = o.fontSize || 18;
@@ -1319,7 +1389,7 @@ function selecionar(id) {
 }
 
 [
-  campos.texto, campos.bg, campos.color, campos.fontSize, campos.weight,
+  campos.bg, campos.color, campos.fontSize, campos.weight,
   campos.lineHeight, campos.font, campos.x, campos.y, campos.w, campos.h, campos.rot,
   campos.border, campos.z, campos.tipo
 ].forEach(campo => {
@@ -1332,22 +1402,8 @@ function atualizarSelecionado() {
 
   const o = objetos[selecionado];
 
-  const textoAnterior = o.texto || "";
-  o.texto = campos.texto.value;
-
-  // Se o usuário editar pela caixa Texto comum, o conteúdo rico é refeito pelo texto simples.
-  delete o.html;
-
   if (!o.lineStyles) o.lineStyles = {};
-
-  const qtdLinhas = String(o.texto || "").split("\n").length;
-  Object.keys(o.lineStyles).forEach(k => {
-    if (Number(k) >= qtdLinhas) delete o.lineStyles[k];
-  });
-
-  if (textoAnterior !== o.texto) {
-    atualizarListaLinhas(campos.linha.value);
-  }
+  limparEstilosDeLinhasExcluidas(o);
 
   o.bg = campos.bg.value;
   o.color = campos.color.value;
@@ -1393,7 +1449,6 @@ function pontoEvento(e) {
 
 function iniciarDrag(e) {
   if (!adminAtivo) return;
-  if (typeInAtivo) return;
   if (digitandoNoObjeto) return;
   if (e.currentTarget && e.currentTarget.isContentEditable) return;
   if (e.target.classList.contains("resize-dot")) return;
