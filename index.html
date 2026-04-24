@@ -144,16 +144,24 @@
     }
 
     .vertical-title {
-      writing-mode: vertical-rl;
-      transform: rotate(180deg);
+      position: relative;
       text-align: center;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: clamp(18px, 2vw, 26px);
-      letter-spacing: .5px;
       padding: 8px 0;
       color: #222;
+      overflow: visible;
+    }
+
+    .vertical-title span {
+      display: inline-block;
+      transform: rotate(-90deg);
+      transform-origin: center center;
+      white-space: nowrap;
+      font-size: clamp(18px, 2vw, 26px);
+      letter-spacing: .5px;
+      line-height: 1.1;
     }
 
     .dispatch-grid {
@@ -248,8 +256,7 @@
     }
 
     .side-code {
-      writing-mode: vertical-rl;
-      transform: rotate(180deg);
+      position: relative;
       background: var(--azul-escuro);
       color: #fff;
       border: 2px solid var(--linha);
@@ -259,6 +266,14 @@
       font-size: 17px;
       font-weight: 800;
       letter-spacing: 1px;
+      overflow: hidden;
+    }
+
+    .side-code span {
+      display: inline-block;
+      transform: rotate(-90deg);
+      transform-origin: center center;
+      white-space: nowrap;
     }
 
     .number-grid {
@@ -472,19 +487,30 @@
     }
 
     .pdf-export .vertical-title {
-      writing-mode: vertical-rl !important;
-      transform: rotate(180deg) !important;
+      position: relative !important;
       text-align: center !important;
       display: flex !important;
       align-items: center !important;
       justify-content: center !important;
-      font-size: 24px !important;
-      line-height: 1.15 !important;
-      letter-spacing: .5px !important;
-      white-space: normal !important;
-      word-break: normal !important;
       overflow: visible !important;
       padding: 8px 0 !important;
+    }
+
+    .pdf-export .vertical-title span {
+      display: inline-block !important;
+      transform: rotate(-90deg) !important;
+      transform-origin: center center !important;
+      white-space: nowrap !important;
+      font-size: 24px !important;
+      line-height: 1.1 !important;
+      letter-spacing: .5px !important;
+    }
+
+    .pdf-export .side-code span {
+      display: inline-block !important;
+      transform: rotate(-90deg) !important;
+      transform-origin: center center !important;
+      white-space: nowrap !important;
     }
 
     @media print {
@@ -542,17 +568,17 @@
 
     <main class="board">
       <section class="zone-row">
-        <div class="vertical-title">Despacho</div>
+        <div class="vertical-title"><span>Despacho</span></div>
         <div class="dispatch-grid" id="dispatchGrid"></div>
       </section>
 
       <section class="zone-row">
-        <div class="vertical-title">Atendimento de Emergência<br>190/193</div>
+        <div class="vertical-title"><span>Atendimento de Emergência<br>190/193</span></div>
         <div class="emergency-wrap" id="emergencyGrid"></div>
       </section>
 
       <section class="zone-row">
-        <div class="vertical-title">Administração</div>
+        <div class="vertical-title"><span>Administração</span></div>
         <div class="admin-grid" id="adminGrid"></div>
       </section>
     </main>
@@ -770,7 +796,7 @@
           </div>
           ${group.rows.map(row => `
             <div class="phone-table">
-              <div class="side-code ${row.red ? 'red' : ''}">${row.code}</div>
+              <div class="side-code ${row.red ? 'red' : ''}"><span>${row.code}</span></div>
               <div class="number-grid" style="grid-template-columns: repeat(${Math.ceil(row.nums.length / 2)}, 1fr)">
                 ${row.nums.map(n => boxHTML('', n, row.red ? 'red' : 'blue', 'small')).join('')}
               </div>
