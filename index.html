@@ -281,6 +281,29 @@
       white-space: pre-wrap;
     }
 
+    .trecho-editor {
+      border: 1px solid #b9c7dc;
+      background: #f4f8ff;
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+    }
+
+    .trecho-editor-titulo {
+      font-size: 13px;
+      font-weight: bold;
+      margin-bottom: 8px;
+      color: #123;
+    }
+
+    #btnAplicarTrecho {
+      width: 100%;
+      background: #006eff;
+      color: #fff;
+      box-shadow: none;
+      margin-top: 6px;
+    }
+
     .painel-btn-excluir {
       width: 100%;
       background: #b00000;
@@ -448,6 +471,47 @@
       <div class="linha-preview" id="linhaPreview">Selecione uma linha para configurar.</div>
     </div>
 
+    <div class="trecho-editor">
+      <div class="trecho-editor-titulo">Formatar trecho selecionado dentro do objeto</div>
+
+      <div class="grade2">
+        <div class="campo">
+          <label>Tamanho do trecho</label>
+          <input id="edTrechoFontSize" type="number" min="6" max="90" value="18">
+        </div>
+
+        <div class="campo">
+          <label>Cor do trecho</label>
+          <input id="edTrechoColor" type="color" value="#111111">
+        </div>
+      </div>
+
+      <div class="grade2">
+        <div class="campo">
+          <label>Fonte do trecho</label>
+          <select id="edTrechoFont">
+            <option value="Arial">Arial</option>
+            <option value="Verdana">Verdana</option>
+            <option value="Tahoma">Tahoma</option>
+            <option value="Georgia">Georgia</option>
+            <option value="'Times New Roman'">Times New Roman</option>
+            <option value="'Courier New'">Courier New</option>
+          </select>
+        </div>
+
+        <div class="campo">
+          <label>Peso do trecho</label>
+          <select id="edTrechoWeight">
+            <option value="normal">Normal</option>
+            <option value="bold">Negrito</option>
+            <option value="900">Extra forte</option>
+          </select>
+        </div>
+      </div>
+
+      <button type="button" id="btnAplicarTrecho" class="btn">Aplicar no trecho selecionado</button>
+    </div>
+
     <div class="grade2">
       <div class="campo">
         <label>Cor fundo</label>
@@ -547,7 +611,8 @@
     <div class="aviso">
       O texto agora se comporta como no Word: a largura do objeto é o limite da escrita,
       e quando o texto alcança esse limite ele quebra automaticamente para a linha de baixo.
-      Use o botão <b>Type In</b> para ativar/desativar a digitação dentro do próprio objeto.
+      Use o botão <b>Type In</b>, selecione uma palavra ou trecho dentro do objeto,
+      escolha tamanho/fonte/cor/peso e clique em <b>Aplicar no trecho selecionado</b>.
       No modo admin, também é possível configurar o <b>espaçamento entre linhas</b>.
       Ao apertar Enter no Texto ou dentro do objeto, a nova linha aparece também dentro do retângulo.
       Cada linha pode ter tamanho, cor, fonte e peso diferentes.
@@ -623,7 +688,12 @@ const campos = {
   linhaColor: document.getElementById("edLinhaColor"),
   linhaFont: document.getElementById("edLinhaFont"),
   linhaWeight: document.getElementById("edLinhaWeight"),
-  linhaPreview: document.getElementById("linhaPreview")
+  linhaPreview: document.getElementById("linhaPreview"),
+  trechoFontSize: document.getElementById("edTrechoFontSize"),
+  trechoColor: document.getElementById("edTrechoColor"),
+  trechoFont: document.getElementById("edTrechoFont"),
+  trechoWeight: document.getElementById("edTrechoWeight"),
+  btnAplicarTrecho: document.getElementById("btnAplicarTrecho")
 };
 
 /* =========================================================
@@ -1214,6 +1284,7 @@ campos.linhaFontSize.addEventListener("input", atualizarEstiloLinhaSelecionada);
 campos.linhaColor.addEventListener("input", atualizarEstiloLinhaSelecionada);
 campos.linhaFont.addEventListener("change", atualizarEstiloLinhaSelecionada);
 campos.linhaWeight.addEventListener("change", atualizarEstiloLinhaSelecionada);
+campos.btnAplicarTrecho.addEventListener("click", aplicarFormatoNoTrechoSelecionado);
 
 function selecionar(id) {
   selecionado = id;
@@ -1263,6 +1334,9 @@ function atualizarSelecionado() {
 
   const textoAnterior = o.texto || "";
   o.texto = campos.texto.value;
+
+  // Se o usuário editar pela caixa Texto comum, o conteúdo rico é refeito pelo texto simples.
+  delete o.html;
 
   if (!o.lineStyles) o.lineStyles = {};
 
@@ -1544,6 +1618,81 @@ btnPDF.addEventListener("click", async function() {
    TYPE DIRETO NO OBJETO COM DOUBLE CLICK
    ========================================================= */
 
+
+function htmlDoObjetoEditavel(el) {
+  const clone = el.cloneNode(true);
+
+  clone.querySelectorAll(".resize-dot").forEach(dot => dot.remove());
+
+  return clone.innerHTML
+    .replace(/<div><br><\/div>/g, "<br>")
+    .replace(/<div>/g, "<br>")
+    .replace(/<\/div>/g, "")
+    .trim();
+}
+
+function selecaoDentroDoObjetoAtivo() {
+  const el = document.querySelector(".box.type-editing");
+  const sel = window.getSelection();
+
+  if (!el || !sel || sel.rangeCount === 0) return false;
+
+  const range = sel.getRangeAt(0);
+
+  return el.contains(range.commonAncestorContainer);
+}
+
+function aplicarFormatoNoTrechoSelecionado() {
+  if (!adminAtivo || !digitandoNoObjeto) {
+    alert("Ative o Type In e clique dentro de um objeto antes de aplicar a formatação.");
+    return;
+  }
+
+  if (!selecaoDentroDoObjetoAtivo()) {
+    alert("Selecione um trecho do texto dentro do objeto.");
+    return;
+  }
+
+  const sel = window.getSelection();
+  const range = sel.getRangeAt(0);
+
+  if (range.collapsed) {
+    alert("Selecione uma palavra ou trecho do texto dentro do objeto.");
+    return;
+  }
+
+  const span = document.createElement("span");
+
+  span.style.fontSize = Number(campos.trechoFontSize.value || 18) + "px";
+  span.style.fontFamily = campos.trechoFont.value || "Arial";
+  span.style.fontWeight = campos.trechoWeight.value || "normal";
+  span.style.color = campos.trechoColor.value || "#111111";
+  span.style.lineHeight = objetos[digitandoNoObjeto]?.lineHeight || 1.15;
+
+  try {
+    range.surroundContents(span);
+  } catch (e) {
+    const conteudo = range.extractContents();
+    span.appendChild(conteudo);
+    range.insertNode(span);
+  }
+
+  sel.removeAllRanges();
+
+  const el = document.querySelector(".box.type-editing");
+  if (el) {
+    const obj = objetos[digitandoNoObjeto];
+
+    obj.html = htmlDoObjetoEditavel(el);
+    obj.texto = textoDoObjetoEditavel(el);
+
+    campos.texto.value = obj.texto;
+    atualizarListaLinhas(campos.linha.value);
+
+    marcarAlterado();
+  }
+}
+
 function textoDoObjetoEditavel(el) {
   return (el.innerText || "")
     .replace(/\u00a0/g, " ")
@@ -1607,6 +1756,7 @@ function atualizarTextoDigitadoNoObjeto(e) {
   if (!obj) return;
 
   obj.texto = textoDoObjetoEditavel(e.currentTarget);
+  obj.html = htmlDoObjetoEditavel(e.currentTarget);
 
   limparEstilosDeLinhasExcluidas(obj);
 
@@ -1627,6 +1777,7 @@ function finalizarDigitacaoNoObjeto(e) {
 
   if (obj) {
     obj.texto = textoDoObjetoEditavel(el);
+    obj.html = htmlDoObjetoEditavel(el);
     limparEstilosDeLinhasExcluidas(obj);
 
     if (selecionado === id) {
