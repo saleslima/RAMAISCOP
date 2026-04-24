@@ -89,6 +89,16 @@
       z-index: 9000 !important;
     }
 
+    body.admin-mode .box.type-editing {
+      cursor: text !important;
+      outline: 4px solid #006eff !important;
+      user-select: text;
+    }
+
+    body.admin-mode .box.type-editing .resize-dot {
+      display: none !important;
+    }
+
     .resize-dot {
       display: none;
       width: 16px;
@@ -519,7 +529,8 @@
 
     <div class="aviso">
       A quantidade de linhas do objeto é definida pelo que for digitado na caixa Texto.
-      Ao apertar Enter no Texto, a nova linha aparece também dentro do retângulo.
+      Dê dois cliques em um objeto para ativar a função Type e digitar diretamente dentro dele.
+      Ao apertar Enter no Texto ou dentro do objeto, a nova linha aparece também dentro do retângulo.
       Cada linha pode ter tamanho, cor, fonte e peso diferentes.
       Clique e arraste qualquer caixa para mover. Também é possível mover com as setas do teclado.
       Use Shift + seta para mover mais rápido. Use o ponto vermelho no canto para aumentar ou diminuir.
@@ -605,6 +616,7 @@ let alterado = false;
 let travarFirebase = false;
 let drag = null;
 let resize = null;
+let digitandoNoObjeto = null;
 
 /* =========================================================
    CORES
@@ -903,6 +915,12 @@ function renderizar() {
       el.addEventListener("click", function(e) {
         e.stopPropagation();
         selecionar(obj.id);
+      });
+
+      el.addEventListener("dblclick", function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        ativarDigitacaoNoObjeto(el, obj.id);
       });
 
       const dot = document.createElement("div");
@@ -1245,6 +1263,8 @@ function pontoEvento(e) {
 
 function iniciarDrag(e) {
   if (!adminAtivo) return;
+  if (digitandoNoObjeto) return;
+  if (e.currentTarget && e.currentTarget.isContentEditable) return;
   if (e.target.classList.contains("resize-dot")) return;
 
   e.preventDefault();
@@ -1462,6 +1482,118 @@ btnPDF.addEventListener("click", async function() {
   }
 });
 
+
+/* =========================================================
+   TYPE DIRETO NO OBJETO COM DOUBLE CLICK
+   ========================================================= */
+
+function textoDoObjetoEditavel(el) {
+  return (el.innerText || "")
+    .replace(/\u00a0/g, " ")
+    .replace(/\n+$/g, "");
+}
+
+function posicionarCursorNoFinal(el) {
+  const range = document.createRange();
+  const selection = window.getSelection();
+
+  range.selectNodeContents(el);
+  range.collapse(false);
+
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
+function ativarDigitacaoNoObjeto(el, id) {
+  if (!adminAtivo) return;
+
+  selecionar(id);
+
+  digitandoNoObjeto = id;
+
+  el.classList.add("type-editing");
+  el.contentEditable = "true";
+  el.spellcheck = false;
+
+  el.addEventListener("mousedown", bloquearEventoDigitacao);
+  el.addEventListener("touchstart", bloquearEventoDigitacao, { passive: false });
+
+  el.addEventListener("input", atualizarTextoDigitadoNoObjeto);
+  el.addEventListener("blur", finalizarDigitacaoNoObjeto);
+  el.addEventListener("keydown", controlarTeclasDigitacao);
+
+  setTimeout(() => {
+    el.focus();
+    posicionarCursorNoFinal(el);
+  }, 50);
+}
+
+function bloquearEventoDigitacao(e) {
+  if (!digitandoNoObjeto) return;
+  e.stopPropagation();
+}
+
+function controlarTeclasDigitacao(e) {
+  if (!digitandoNoObjeto) return;
+
+  if (e.key === "Escape") {
+    e.preventDefault();
+    finalizarDigitacaoNoObjeto(e);
+  }
+}
+
+function atualizarTextoDigitadoNoObjeto(e) {
+  if (!digitandoNoObjeto) return;
+
+  const id = digitandoNoObjeto;
+  const obj = objetos[id];
+  if (!obj) return;
+
+  obj.texto = textoDoObjetoEditavel(e.currentTarget);
+
+  limparEstilosDeLinhasExcluidas(obj);
+
+  if (selecionado === id) {
+    campos.texto.value = obj.texto;
+    atualizarListaLinhas(campos.linha.value);
+  }
+
+  marcarAlterado();
+}
+
+function finalizarDigitacaoNoObjeto(e) {
+  if (!digitandoNoObjeto) return;
+
+  const id = digitandoNoObjeto;
+  const el = e.currentTarget;
+  const obj = objetos[id];
+
+  if (obj) {
+    obj.texto = textoDoObjetoEditavel(el);
+    limparEstilosDeLinhasExcluidas(obj);
+
+    if (selecionado === id) {
+      campos.texto.value = obj.texto;
+      atualizarListaLinhas(campos.linha.value);
+    }
+  }
+
+  el.contentEditable = "false";
+  el.classList.remove("type-editing");
+
+  el.removeEventListener("mousedown", bloquearEventoDigitacao);
+  el.removeEventListener("touchstart", bloquearEventoDigitacao);
+  el.removeEventListener("input", atualizarTextoDigitadoNoObjeto);
+  el.removeEventListener("blur", finalizarDigitacaoNoObjeto);
+  el.removeEventListener("keydown", controlarTeclasDigitacao);
+
+  digitandoNoObjeto = null;
+
+  marcarAlterado();
+  renderizar();
+}
+
+
 /* =========================================================
    MOVER COM SETAS DO TECLADO
    ========================================================= */
@@ -1470,7 +1602,7 @@ document.addEventListener("keydown", function(e) {
   if (!adminAtivo || !selecionado) return;
 
   const tag = document.activeElement.tagName.toLowerCase();
-  const editandoCampo = tag === "input" || tag === "textarea" || tag === "select";
+  const editandoCampo = tag === "input" || tag === "textarea" || tag === "select" || document.activeElement.isContentEditable;
 
   if (editandoCampo) return;
 
