@@ -172,6 +172,18 @@
       padding: 8px 13px;
     }
 
+    #btnTypeIn {
+      display: none;
+      background: #555;
+      color: #fff;
+    }
+
+    #btnTypeIn.ativo {
+      background: #006eff;
+      color: #fff;
+      box-shadow: 0 0 0 3px rgba(0, 110, 255, .25);
+    }
+
     #btnReset {
       display: none;
       background: #f3b300;
@@ -372,6 +384,7 @@
   <div id="toolbar">
     <button id="btnSalvar" class="btn">Salvar alterações</button>
     <button id="btnNovo" class="btn">+</button>
+    <button id="btnTypeIn" class="btn">Type In</button>
     <button id="btnReset" class="btn">Restaurar padrão</button>
     <button id="btnSair" class="btn">Sair admin</button>
     <button id="btnPDF" class="btn">PDF</button>
@@ -529,7 +542,9 @@
 
     <div class="aviso">
       A quantidade de linhas do objeto é definida pelo que for digitado na caixa Texto.
-      Dê dois cliques em um objeto para ativar a função Type e digitar diretamente dentro dele.
+      Use o botão <b>Type In</b> para ativar/desativar a digitação dentro do próprio objeto.
+      Com Type In ativado, clique no objeto e digite diretamente dentro dele.
+      Também é possível dar dois cliques em um objeto para ativar a função Type.
       Ao apertar Enter no Texto ou dentro do objeto, a nova linha aparece também dentro do retângulo.
       Cada linha pode ter tamanho, cor, fonte e peso diferentes.
       Clique e arraste qualquer caixa para mover. Também é possível mover com as setas do teclado.
@@ -577,6 +592,7 @@ const btnAdmin = document.getElementById("btnAdmin");
 const btnPDF = document.getElementById("btnPDF");
 const btnSalvar = document.getElementById("btnSalvar");
 const btnNovo = document.getElementById("btnNovo");
+const btnTypeIn = document.getElementById("btnTypeIn");
 const btnSair = document.getElementById("btnSair");
 const btnReset = document.getElementById("btnReset");
 const painel = document.getElementById("painel");
@@ -617,6 +633,7 @@ let travarFirebase = false;
 let drag = null;
 let resize = null;
 let digitandoNoObjeto = null;
+let typeInAtivo = false;
 
 /* =========================================================
    CORES
@@ -914,7 +931,12 @@ function renderizar() {
 
       el.addEventListener("click", function(e) {
         e.stopPropagation();
-        selecionar(obj.id);
+
+        if (typeInAtivo) {
+          ativarDigitacaoNoObjeto(el, obj.id);
+        } else {
+          selecionar(obj.id);
+        }
       });
 
       el.addEventListener("dblclick", function(e) {
@@ -980,6 +1002,7 @@ btnAdmin.addEventListener("click", function() {
     document.body.classList.add("admin-mode");
     painel.style.display = "block";
     btnNovo.style.display = "inline-block";
+    btnTypeIn.style.display = "inline-block";
     btnSair.style.display = "inline-block";
     btnReset.style.display = "inline-block";
     alert("Modo administrador ativado. Clique em uma caixa para editar.");
@@ -990,6 +1013,27 @@ btnAdmin.addEventListener("click", function() {
 });
 
 
+
+
+btnTypeIn.addEventListener("click", function() {
+  if (!adminAtivo) return;
+
+  typeInAtivo = !typeInAtivo;
+  btnTypeIn.classList.toggle("ativo", typeInAtivo);
+
+  if (typeInAtivo) {
+    alert("Type In ativado. Agora clique em um objeto para digitar dentro dele.");
+  } else {
+    if (digitandoNoObjeto) {
+      const el = document.querySelector('.box[data-id="' + digitandoNoObjeto + '"]');
+      if (el) el.blur();
+      digitandoNoObjeto = null;
+    }
+
+    alert("Type In desativado. Voltou ao modo normal de edição.");
+    renderizar();
+  }
+});
 
 btnExcluirObjeto.addEventListener("click", function() {
   if (!adminAtivo) return;
@@ -1055,6 +1099,9 @@ btnSair.addEventListener("click", function() {
   document.body.classList.remove("admin-mode");
   painel.style.display = "none";
   btnNovo.style.display = "none";
+  btnTypeIn.style.display = "none";
+  btnTypeIn.classList.remove("ativo");
+  typeInAtivo = false;
   btnSair.style.display = "none";
   btnReset.style.display = "none";
   renderizar();
@@ -1263,6 +1310,7 @@ function pontoEvento(e) {
 
 function iniciarDrag(e) {
   if (!adminAtivo) return;
+  if (typeInAtivo) return;
   if (digitandoNoObjeto) return;
   if (e.currentTarget && e.currentTarget.isContentEditable) return;
   if (e.target.classList.contains("resize-dot")) return;
