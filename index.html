@@ -440,6 +440,40 @@
       }
     }
 
+    .pdf-export {
+      width: 1600px;
+      max-width: none;
+    }
+
+    .pdf-export .topbar {
+      position: static;
+      border-bottom: none;
+    }
+
+    .pdf-export .header-actions,
+    .pdf-export .modal-backdrop {
+      display: none !important;
+    }
+
+    .pdf-export .zone-row {
+      grid-template-columns: 44px 1fr;
+    }
+
+    .pdf-export .vertical-title {
+      writing-mode: initial;
+      transform: none;
+      font-size: 20px;
+      line-height: 1.1;
+      word-break: keep-all;
+      overflow-wrap: normal;
+      white-space: normal;
+      padding: 0 2px;
+    }
+
+    .pdf-export .vertical-title br {
+      display: none;
+    }
+
     @media print {
       .topbar {
         position: static;
@@ -808,49 +842,46 @@
     document.getElementById('generatePdf').onclick = async () => {
       const btn = document.getElementById('generatePdf');
       const originalText = btn.textContent;
+      const page = document.querySelector('.page');
+      const headerActions = document.querySelector('.header-actions');
 
       try {
         btn.textContent = 'Gerando...';
         btn.disabled = true;
 
-        const headerActions = document.querySelector('.header-actions');
+        page.classList.add('pdf-export');
         headerActions.style.display = 'none';
 
-        const page = document.querySelector('.page');
+        await new Promise(resolve => setTimeout(resolve, 250));
+
         const canvas = await html2canvas(page, {
           scale: 2,
           useCORS: true,
-          backgroundColor: '#ffffff'
+          backgroundColor: '#ffffff',
+          windowWidth: 1600,
+          scrollX: 0,
+          scrollY: 0
         });
 
-        headerActions.style.display = 'flex';
-
-        const imgData = canvas.toDataURL('image/png');
+        const imgData = canvas.toDataURL('image/png', 1.0);
         const { jsPDF } = window.jspdf;
 
+        const orientation = canvas.width > canvas.height ? 'landscape' : 'portrait';
         const pdf = new jsPDF({
-          orientation: 'landscape',
-          unit: 'mm',
-          format: 'a4'
+          orientation,
+          unit: 'px',
+          format: [canvas.width, canvas.height],
+          compress: true
         });
 
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
-        const imgWidth = canvas.width;
-        const imgHeight = canvas.height;
-        const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-        const finalWidth = imgWidth * ratio;
-        const finalHeight = imgHeight * ratio;
-        const marginX = (pdfWidth - finalWidth) / 2;
-        const marginY = (pdfHeight - finalHeight) / 2;
-
-        pdf.addImage(imgData, 'PNG', marginX, marginY, finalWidth, finalHeight);
+        pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
         pdf.save('copom.pdf');
       } catch (error) {
         alert('Não foi possível gerar o PDF. Verifique sua internet, pois a geração usa bibliotecas online.');
         console.error(error);
       } finally {
-        document.querySelector('.header-actions').style.display = 'flex';
+        page.classList.remove('pdf-export');
+        headerActions.style.display = 'flex';
         btn.textContent = originalText;
         btn.disabled = false;
       }
