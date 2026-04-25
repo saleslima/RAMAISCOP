@@ -65,6 +65,9 @@
       color: #111;
       background: #cfe2f3;
       padding: 3px 4px;
+      box-sizing: border-box;
+      overflow-wrap: anywhere;
+      word-break: break-word;
     }
 
     .box.texto-livre {
@@ -271,19 +274,32 @@
       white-space: pre-wrap;
     }
 
+    .rich-editor-viewport {
+      width: 100%;
+      max-width: 100%;
+      overflow: auto;
+      border: 1px dashed #9bb4d4;
+      background: #eef5ff;
+      border-radius: 8px;
+      padding: 8px;
+    }
+
     .rich-editor {
       min-height: 95px;
-      max-height: 190px;
-      overflow-y: auto;
+      max-height: none;
+      overflow: hidden;
       border: 1px solid #888;
       background: #fff;
       border-radius: 8px;
-      padding: 8px;
+      padding: 3px 4px;
       outline: none;
+      box-sizing: border-box;
+      display: block;
       white-space: pre-wrap;
-      overflow-wrap: break-word;
+      overflow-wrap: anywhere;
       word-break: break-word;
       line-height: 1.15;
+      text-align: center;
     }
 
     .rich-editor:focus {
@@ -429,7 +445,9 @@
 
     <div class="campo">
       <label>Texto do objeto</label>
-      <div id="edTextoRich" class="rich-editor" contenteditable="true"></div>
+      <div class="rich-editor-viewport">
+        <div id="edTextoRich" class="rich-editor" contenteditable="true"></div>
+      </div>
       <textarea id="edTexto" style="display:none;"></textarea>
     </div>
 
@@ -619,10 +637,10 @@
     </div>
 
     <div class="aviso">
-      O texto agora pode ter trechos diferentes dentro do mesmo objeto.
-      Selecione uma palavra ou trecho no campo <b>Texto do objeto</b>,
-      escolha tamanho/fonte/cor/peso e clique em <b>Aplicar no trecho selecionado</b>.
-      O texto quebra automaticamente dentro do limite do retângulo.
+      O texto do objeto agora acompanha o mesmo formato e a mesma distribuição de linhas
+      exibidos na caixa <b>Texto do objeto</b>. A própria largura e altura do objeto são o limite da escrita:
+      quando o texto chega ao limite horizontal, ele continua automaticamente na linha de baixo.
+      Você pode editar pelo painel ou dar <b>duplo clique no objeto</b> para digitar diretamente dentro dele.
       Ao apertar Enter no Texto ou dentro do objeto, a nova linha aparece também dentro do retângulo.
       Cada linha pode ter tamanho, cor, fonte e peso diferentes.
       Clique e arraste qualquer caixa para mover. Também é possível mover com as setas do teclado.
@@ -1022,8 +1040,7 @@ function renderizar() {
       el.addEventListener("dblclick", function(e) {
         e.preventDefault();
         e.stopPropagation();
-        selecionar(obj.id);
-        campos.textoRich.focus();
+        ativarEdicaoDiretaNoObjeto(el, obj.id);
       });
 
       const dot = document.createElement("div");
@@ -1260,6 +1277,26 @@ function atualizarEstiloLinhaSelecionada() {
 }
 
 
+
+function sincronizarEditorComObjeto(obj) {
+  if (!obj || !campos.textoRich) return;
+
+  const largura = Math.max(Number(obj.w || 120), 40);
+  const altura = Math.max(Number(obj.h || 55), 32);
+
+  campos.textoRich.style.width = largura + "px";
+  campos.textoRich.style.minHeight = altura + "px";
+  campos.textoRich.style.height = altura + "px";
+  campos.textoRich.style.fontSize = Number(obj.fontSize || 18) + "px";
+  campos.textoRich.style.fontFamily = obj.font || "Arial";
+  campos.textoRich.style.fontWeight = obj.weight || "bold";
+  campos.textoRich.style.lineHeight = String(obj.lineHeight || 1.15);
+  campos.textoRich.style.color = obj.color || "#111111";
+  campos.textoRich.style.background = obj.tipo === "texto-livre" ? "transparent" : (obj.bg || "#ffffff");
+  campos.textoRich.style.borderWidth = Math.max(Number(obj.border ?? 1), 1) + "px";
+  campos.textoRich.style.textAlign = "center";
+}
+
 function limparHTMLDoEditor(html) {
   return String(html || "")
     .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
@@ -1278,6 +1315,8 @@ function atualizarObjetoPeloEditorRico() {
   if (!selecionado) return;
 
   const o = objetos[selecionado];
+
+  sincronizarEditorComObjeto(o);
 
   o.html = limparHTMLDoEditor(campos.textoRich.innerHTML);
   o.texto = textoSimplesDoHTML(o.html);
@@ -1361,6 +1400,7 @@ function selecionar(id) {
 
   campos.texto.value = o.texto || "";
   campos.textoRich.innerHTML = o.html || montarTextoComLinhas(o);
+  sincronizarEditorComObjeto(o);
   campos.bg.value = paraHex(o.bg || "#ffffff");
   campos.color.value = paraHex(o.color || "#111111");
   campos.fontSize.value = o.fontSize || 18;
@@ -1419,6 +1459,8 @@ function atualizarSelecionado() {
   o.border = Number(campos.border.value ?? 2);
   o.z = Number(campos.z.value || 1);
   o.tipo = campos.tipo.value;
+
+  sincronizarEditorComObjeto(o);
 
   marcarAlterado();
   renderizar();
@@ -1613,6 +1655,126 @@ refObjetos.on("value", function(snapshot) {
 
   renderizar();
 });
+
+
+
+/* =========================================================
+   EDIÇÃO DIRETA COM DUPLO CLIQUE NO OBJETO
+   ========================================================= */
+
+function limparElementoDeEdicao(el) {
+  const clone = el.cloneNode(true);
+  clone.querySelectorAll(".resize-dot").forEach(dot => dot.remove());
+  return clone;
+}
+
+function htmlDoObjetoDireto(el) {
+  const clone = limparElementoDeEdicao(el);
+
+  return limparHTMLDoEditor(clone.innerHTML)
+    .replace(/<div><br><\/div>/g, "<br>")
+    .replace(/<div>/g, "<br>")
+    .replace(/<\/div>/g, "")
+    .trim();
+}
+
+function textoDoObjetoDireto(el) {
+  const clone = limparElementoDeEdicao(el);
+
+  return (clone.innerText || "")
+    .replace(/\u00a0/g, " ")
+    .replace(/\n+$/g, "");
+}
+
+function posicionarCursorNoFinalObjeto(el) {
+  const range = document.createRange();
+  const selection = window.getSelection();
+
+  range.selectNodeContents(el);
+  range.collapse(false);
+
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
+function ativarEdicaoDiretaNoObjeto(el, id) {
+  if (!adminAtivo) return;
+
+  selecionado = id;
+  digitandoNoObjeto = id;
+
+  // Esconde o painel para o usuário editar somente dentro do próprio objeto.
+  painel.style.display = "none";
+
+  el.classList.add("type-editing");
+  el.contentEditable = "true";
+  el.spellcheck = false;
+
+  el.addEventListener("mousedown", impedirArrasteDuranteEdicaoDireta);
+  el.addEventListener("touchstart", impedirArrasteDuranteEdicaoDireta, { passive: false });
+  el.addEventListener("input", atualizarTextoDaEdicaoDireta);
+  el.addEventListener("blur", finalizarEdicaoDireta);
+  el.addEventListener("keydown", teclasDaEdicaoDireta);
+
+  setTimeout(() => {
+    el.focus();
+    posicionarCursorNoFinalObjeto(el);
+  }, 50);
+}
+
+function impedirArrasteDuranteEdicaoDireta(e) {
+  if (!digitandoNoObjeto) return;
+  e.stopPropagation();
+}
+
+function teclasDaEdicaoDireta(e) {
+  if (!digitandoNoObjeto) return;
+
+  if (e.key === "Escape") {
+    e.preventDefault();
+    e.currentTarget.blur();
+  }
+}
+
+function atualizarTextoDaEdicaoDireta(e) {
+  if (!digitandoNoObjeto) return;
+
+  const obj = objetos[digitandoNoObjeto];
+  if (!obj) return;
+
+  obj.html = htmlDoObjetoDireto(e.currentTarget);
+  obj.texto = textoDoObjetoDireto(e.currentTarget);
+
+  limparEstilosDeLinhasExcluidas(obj);
+  marcarAlterado();
+}
+
+function finalizarEdicaoDireta(e) {
+  if (!digitandoNoObjeto) return;
+
+  const id = digitandoNoObjeto;
+  const obj = objetos[id];
+
+  if (obj) {
+    obj.html = htmlDoObjetoDireto(e.currentTarget);
+    obj.texto = textoDoObjetoDireto(e.currentTarget);
+    limparEstilosDeLinhasExcluidas(obj);
+  }
+
+  e.currentTarget.contentEditable = "false";
+  e.currentTarget.classList.remove("type-editing");
+
+  e.currentTarget.removeEventListener("mousedown", impedirArrasteDuranteEdicaoDireta);
+  e.currentTarget.removeEventListener("touchstart", impedirArrasteDuranteEdicaoDireta);
+  e.currentTarget.removeEventListener("input", atualizarTextoDaEdicaoDireta);
+  e.currentTarget.removeEventListener("blur", finalizarEdicaoDireta);
+  e.currentTarget.removeEventListener("keydown", teclasDaEdicaoDireta);
+
+  digitandoNoObjeto = null;
+
+  marcarAlterado();
+  renderizar();
+}
 
 
 /* =========================================================
